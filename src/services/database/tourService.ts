@@ -42,10 +42,22 @@ export const tourService = {
         .select('tour_data')
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
-      // Transform the data to return just the tour objects
-      return data?.map(item => item.tour_data as Tour) || [];
+      // Handle case where data is null or empty
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Transform and validate the data
+      const tours = data
+        .filter(item => item.tour_data) // Filter out any null or undefined tour_data
+        .map(item => item.tour_data as Tour);
+
+      return tours;
     } catch (error) {
       console.error('Error getting published tours:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to load published tours');
