@@ -1,5 +1,3 @@
-import { TourExtra } from './api';
-
 export interface ExtraPrice {
   adult_tour_sell: number;
   child_tour_sell: number;
@@ -10,8 +8,22 @@ export interface ExtraPrice {
   infant_commission: number;
 }
 
-export interface ProcessedExtra extends TourExtra {
+export interface ExtraAvailability {
+  availability: number;
+  operational: boolean;
+  expired: boolean;
+}
+
+export interface ProcessedExtra {
+  name: string;
+  code: string;
+  extra_id: number;
+  availability?: ExtraAvailability;
   pricing?: ExtraPrice;
+  allow_adult: boolean;
+  allow_child: boolean;
+  allow_infant: boolean;
+  conditions?: string;
 }
 
 export interface ExtrasResponse {

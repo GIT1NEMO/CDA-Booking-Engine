@@ -1,18 +1,22 @@
 import React, { useMemo } from 'react';
-import { DollarSign, Package, Users } from 'lucide-react';
-import { PricingBreakdown } from './PricingBreakdown';
-import { useTourPricing } from '../../hooks/useTourPricing';
+import { DollarSign } from 'lucide-react';
+import { BasePriceSummary } from './PriceSummary/BasePriceSummary';
+import { ExtrasSummary } from './PriceSummary/ExtrasSummary';
+import { CommissionDisplay } from './CommissionDisplay';
+import { calculateTotalCommission } from '../../utils/commissionCalculator';
 
 interface TotalPriceSummaryProps {
   basePrice: {
     adult: number;
     child: number;
     family: number;
+    infant: number;
   };
   guestCounts: {
     adults: number;
     children: number;
     families: number;
+    infants: number;
   };
   selectedExtras: Array<{
     adultId: number;
@@ -28,6 +32,12 @@ interface TotalPriceSummaryProps {
     };
   }>;
   currencySymbol?: string;
+  commissionRates?: {
+    adult?: number;
+    child?: number;
+    family?: number;
+    infant?: number;
+  };
 }
 
 export function TotalPriceSummary({
@@ -35,25 +45,57 @@ export function TotalPriceSummary({
   guestCounts,
   selectedExtras,
   availableExtras,
-  currencySymbol = '$'
+  currencySymbol = '$',
+  commissionRates = {
+    infant: 10 // Default commission rate
+  }
 }: TotalPriceSummaryProps) {
-  // Memoize the basePrices object to prevent unnecessary recalculations
-  const basePrices = useMemo(() => ({
-    adult_tour_sell: basePrice.adult,
-    child_tour_sell: basePrice.child,
-    non_per_pax_sell: basePrice.family,
-    currency_symbol: currencySymbol
-  }), [basePrice.adult, basePrice.child, basePrice.family, currencySymbol]);
+  // Ensure all price values are numbers with defaults of 0
+  const sanitizedPrices = useMemo(() => ({
+    adult: Number(basePrice.adult) || 0,
+    child: Number(basePrice.child) || 0,
+    family: Number(basePrice.family) || 0,
+    infant: Number(basePrice.infant) || 0
+  }), [basePrice]);
 
-  const { totalPrice, breakdown } = useTourPricing(
-    basePrices,
-    guestCounts,
-    selectedExtras,
-    availableExtras
-  );
+  // Ensure all guest counts are numbers with defaults of 0
+  const sanitizedCounts = useMemo(() => ({
+    adults: Number(guestCounts.adults) || 0,
+    children: Number(guestCounts.children) || 0,
+    families: Number(guestCounts.families) || 0,
+    infants: Number(guestCounts.infants) || 0
+  }), [guestCounts]);
 
-  // Filter out selections with no extraId
-  const validExtras = selectedExtras.filter(selection => selection.extraId !== null);
+  // Calculate extras total with validation
+  const extrasTotal = useMemo(() => {
+    return selectedExtras.reduce((total, selection) => {
+      if (!selection.extraId) return total;
+      const extra = availableExtras.find(e => e.code === selection.extraId);
+      const extraPrice = Number(extra?.pricing?.adult_tour_sell) || 0;
+      return total + extraPrice;
+    }, 0);
+  }, [selectedExtras, availableExtras]);
+
+  // Calculate total price
+  const totalPrice = useMemo(() => {
+    const baseTotal = 
+      sanitizedCounts.adults * sanitizedPrices.adult +
+      sanitizedCounts.children * sanitizedPrices.child +
+      sanitizedCounts.families * sanitizedPrices.family +
+      sanitizedCounts.infants * sanitizedPrices.infant;
+    
+    return baseTotal + extrasTotal;
+  }, [sanitizedCounts, sanitizedPrices, extrasTotal]);
+
+  // Calculate commission on total price including extras
+  const totalCommissionAmount = useMemo(() => {
+    return calculateTotalCommission(
+      commissionRates,
+      sanitizedCounts,
+      sanitizedPrices,
+      extrasTotal
+    );
+  }, [commissionRates, sanitizedCounts, sanitizedPrices, extrasTotal]);
 
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg border-2 border-gray-100">
@@ -63,103 +105,41 @@ export function TotalPriceSummary({
       </h3>
 
       <div className="space-y-6">
-        {/* Base Price Section */}
-        <div className="bg-gray-50 p-6 rounded-xl">
-          <h4 className="font-semibold text-gray-900 mb-4">Base Tour Prices</h4>
-          <div className="space-y-4">
-            {guestCounts.adults > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">
-                  Adults ({guestCounts.adults} × {currencySymbol}{basePrice.adult.toFixed(2)})
-                </span>
-                <span className="font-medium text-gray-900">
-                  {currencySymbol}{(guestCounts.adults * basePrice.adult).toFixed(2)}
-                </span>
-              </div>
-            )}
-            
-            {guestCounts.children > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">
-                  Children ({guestCounts.children} × {currencySymbol}{basePrice.child.toFixed(2)})
-                </span>
-                <span className="font-medium text-gray-900">
-                  {currencySymbol}{(guestCounts.children * basePrice.child).toFixed(2)}
-                </span>
-              </div>
-            )}
-
-            {guestCounts.families > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700">
-                  Family Packages ({guestCounts.families} × {currencySymbol}{basePrice.family.toFixed(2)})
-                </span>
-                <span className="font-medium text-gray-900">
-                  {currencySymbol}{(guestCounts.families * basePrice.family).toFixed(2)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Selected Extras Section */}
-        {validExtras.length > 0 && (
-          <div className="bg-gray-50 p-6 rounded-xl space-y-4">
-            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-500" />
-              Selected Extras
-            </h4>
-
-            <div className="divide-y divide-gray-200">
-              {validExtras.map((selection) => {
-                const extra = availableExtras.find(e => e.code === selection.extraId);
-                if (!extra?.pricing) return null;
-
-                return (
-                  <div 
-                    key={`${selection.adultId}-${selection.extraId}`}
-                    className="py-4 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-700 font-medium">Adult {selection.adultId}</span>
-                        </div>
-                        <div>
-                          <p className="text-gray-900">{extra.name}</p>
-                          <p className="text-sm text-gray-500">Code: {extra.code}</p>
-                        </div>
-                      </div>
-                      <span className="font-semibold text-gray-900">
-                        {currencySymbol}{extra.pricing.adult_tour_sell.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="pt-4 mt-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-700">Extras Total</span>
-                  <span className="text-lg font-semibold text-gray-900">
-                    {currencySymbol}{breakdown.extrasCost.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Final Price Breakdown */}
-        <PricingBreakdown 
-          breakdown={breakdown}
-          totalPrice={totalPrice}
+        <BasePriceSummary
+          basePrice={sanitizedPrices}
+          guestCounts={sanitizedCounts}
+          currencySymbol={currencySymbol}
         />
 
-        <p className="mt-4 text-sm text-gray-500 text-center">
-          All prices are in Australian Dollars (AUD) and include GST
-        </p>
+        {selectedExtras.length > 0 && (
+          <ExtrasSummary
+            selectedExtras={selectedExtras}
+            availableExtras={availableExtras}
+            currencySymbol={currencySymbol}
+          />
+        )}
+
+        <div className="mt-8 pt-6 border-t-2 border-gray-100">
+          <div className="flex justify-between items-center bg-blue-50 p-6 rounded-xl">
+            <span className="text-xl font-bold text-gray-900">Total Price</span>
+            <div className="text-3xl font-bold text-green-600 flex items-center gap-1">
+              <DollarSign className="h-8 w-8" />
+              <span>{totalPrice.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <CommissionDisplay
+            commission={{
+              rate: commissionRates.infant || 0
+            }}
+            totalCommissionAmount={totalCommissionAmount}
+            currencySymbol={currencySymbol}
+          />
+
+          <p className="mt-4 text-sm text-gray-500 text-center">
+            All prices are in Australian Dollars (AUD) and include GST
+          </p>
+        </div>
       </div>
     </div>
   );

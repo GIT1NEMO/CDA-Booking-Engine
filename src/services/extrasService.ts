@@ -33,10 +33,24 @@ export const fetchTourExtras = async (
       params.timeId
     );
 
+    // Fetch availability for each extra
+    const availabilityRequests = extrasResponse.extras.map(extra => ({
+      host_id: params.hostId,
+      tour_code: extra.code,
+      basis_id: params.basisId,
+      subbasis_id: params.subbasisId,
+      tour_date: params.tourDate,
+      tour_time_id: params.timeId
+    }));
+
+    const [pricesResponse, availabilityResponse] = await Promise.all([
+      api.readPriceRange(availabilityRequests),
+      api.readAvailabilityRange(availabilityRequests)
+    ]);
+
     // Sanitize the response
     const sanitizedResponse = sanitizeApiResponse(extrasResponse);
     
-    // Check if we have a valid response with extras
     if (!sanitizedResponse || !Array.isArray(sanitizedResponse.extras)) {
       console.warn('Invalid extras response:', sanitizedResponse);
       return { 
@@ -46,24 +60,12 @@ export const fetchTourExtras = async (
       };
     }
 
-    // Process extras and fetch prices
-    const priceRequests = sanitizedResponse.extras.map(extra => ({
-      host_id: params.hostId,
-      tour_code: extra.code,
-      basis_id: params.basisId,
-      subbasis_id: params.subbasisId,
-      tour_date: params.tourDate,
-      tour_time_id: params.timeId
-    }));
-
-    // Fetch prices for all extras
-    const pricesResponse = await api.readPriceRange(priceRequests);
-
-    // Process and combine extras with their prices
+    // Process and combine extras with their prices and availability
     const processedExtras = sanitizedResponse.extras.map((extra, index) => ({
       ...extra,
       host_id: params.hostId,
       pricing: pricesResponse.prices[index],
+      availability: availabilityResponse.availabilities[index],
       basis_id: params.basisId,
       subbasis_id: params.subbasisId,
       time_id: params.timeId
@@ -73,7 +75,8 @@ export const fetchTourExtras = async (
       extras: processedExtras,
       rawData: {
         extras: sanitizedResponse.extras,
-        prices: pricesResponse.prices
+        prices: pricesResponse.prices,
+        availability: availabilityResponse.availabilities
       }
     };
   } catch (error) {

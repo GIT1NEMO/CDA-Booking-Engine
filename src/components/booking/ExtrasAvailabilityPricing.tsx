@@ -5,6 +5,7 @@ import { SelectionsSummary } from './SelectionsSummary';
 import { LoadingState } from '../common/LoadingState';
 import { useExtrasData } from '../../hooks/useExtrasData';
 import { ExtraOption } from '../../types/extras';
+import { ExtrasJsonViewer } from './extras/ExtrasJsonViewer';
 
 interface ExtrasAvailabilityPricingProps {
   extras: ExtraOption[];
@@ -24,9 +25,7 @@ export function ExtrasAvailabilityPricing({
     loading,
     error,
     adultSelections,
-    handleExtraSelection,
-    expandedAdultId,
-    setExpandedAdultId
+    handleExtraSelection
   } = useExtrasData({
     extras,
     selectedDate,
@@ -68,6 +67,8 @@ export function ExtrasAvailabilityPricing({
             availableExtras={processedData}
             loading={loading}
           />
+
+          <ExtrasJsonViewer extras={processedData} />
         </div>
       )}
     </div>

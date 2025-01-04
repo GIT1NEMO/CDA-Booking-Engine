@@ -25,33 +25,17 @@ export function useExtrasData({
 
   // Initialize adult selections when numberOfAdults changes
   useEffect(() => {
-    const initializeSelections = () => {
-      const newSelections = Array.from({ length: numberOfAdults }, (_, index) => ({
-        adultId: index + 1,
-        extraId: null
-      }));
+    const newSelections = Array.from({ length: numberOfAdults }, (_, index) => ({
+      adultId: index + 1,
+      extraId: null
+    }));
+    setAdultSelections(newSelections);
+  }, [numberOfAdults]);
 
-      setAdultSelections(newSelections);
-      onSelectionsChange(newSelections);
-    };
-
-    initializeSelections();
-  }, [numberOfAdults, onSelectionsChange]);
-
-  // Handle extra selection
-  const handleExtraSelection = useCallback((adultId: number, extraId: string | null) => {
-    setAdultSelections(prevSelections => {
-      const newSelections = prevSelections.map(selection =>
-        selection.adultId === adultId
-          ? { ...selection, extraId }
-          : selection
-      );
-      
-      // Notify parent component of changes
-      onSelectionsChange(newSelections);
-      return newSelections;
-    });
-  }, [onSelectionsChange]);
+  // Notify parent of selection changes
+  useEffect(() => {
+    onSelectionsChange(adultSelections);
+  }, [adultSelections, onSelectionsChange]);
 
   // Process extras data
   useEffect(() => {
@@ -65,7 +49,6 @@ export function useExtrasData({
         const credentials = storageService.getCredentials();
         if (!credentials) throw new Error('API credentials not found');
 
-        const api = createApiClient(credentials);
         const processed = await Promise.all(
           extras.map(async (extra) => {
             try {
@@ -104,6 +87,16 @@ export function useExtrasData({
 
     processExtras();
   }, [extras, selectedDate]);
+
+  const handleExtraSelection = useCallback((adultId: number, extraId: string | null) => {
+    setAdultSelections(prev => 
+      prev.map(selection => 
+        selection.adultId === adultId
+          ? { ...selection, extraId }
+          : selection
+      )
+    );
+  }, []);
 
   return {
     processedData,
